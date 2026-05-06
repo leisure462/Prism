@@ -49,8 +49,17 @@ jobs:
         env:
           RCT_NO_LAUNCH_PACKAGER: true
 
-      - name: Sign APK (if secrets available)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      - name: Check signing secrets
+        id: check_secrets
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sign APK with release keystore
+        if: steps.check_secrets.outputs.has_keystore == 'true' && startsWith(github.ref, 'refs/tags/v')
         uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
@@ -62,18 +71,19 @@ jobs:
         env:
           BUILD_TOOLS_VERSION: "34.0.0"
 
-      - name: Upload unsigned APK artifact
+      - name: Upload APK artifact (branches)
         if: "!startsWith(github.ref, 'refs/tags/v')"
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-unsigned
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          name: app-release
+          path: android/app/build/outputs/apk/release/*.apk
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          files: |
+            ${{ steps.sign_app.outputs.signedReleaseFile || 'android/app/build/outputs/apk/release/app-release.apk' }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
