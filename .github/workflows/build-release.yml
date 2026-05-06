@@ -43,7 +43,9 @@ jobs:
           keytool -genkey -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Build Release APK
-        run: cd android && gradle assembleRelease --no-daemon
+        run: cd android && gradle assembleRelease --no-daemon --stacktrace --info
+        env:
+          RCT_NO_LAUNCH_PACKAGER: true
 
       - name: Sign APK (if secrets available)
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
