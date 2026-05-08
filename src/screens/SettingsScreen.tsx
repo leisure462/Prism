@@ -13,6 +13,12 @@ import { useSettingsStore } from '../store/settingsStore';
 import { themes, fontOptions } from '../utils/theme';
 import IconButton from '../components/IconButton';
 
+const flipTypeLabels: Record<string, string> = {
+  slide: '滑动翻页',
+  tap: '点击翻页',
+  volume: '音量键翻页',
+};
+
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -78,6 +84,36 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
           </SettingRow>
+
+          <SettingRow label="水平边距">
+            <View style={styles.stepper}>
+              <Pressable onPress={() => settings.setMarginHorizontal(Math.max(8, settings.marginHorizontal - 4))}>
+                <Text style={[styles.stepperBtn, { color: theme.accent }]}>−</Text>
+              </Pressable>
+              <Text style={[styles.stepperValue, { color: theme.text }]}>{settings.marginHorizontal}px</Text>
+              <Pressable onPress={() => settings.setMarginHorizontal(Math.min(48, settings.marginHorizontal + 4))}>
+                <Text style={[styles.stepperBtn, { color: theme.accent }]}>+</Text>
+              </Pressable>
+            </View>
+          </SettingRow>
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: theme.secondaryText }]}>字体</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.divider }]}>
+          {fontOptions.map((opt) => (
+            <Pressable
+              key={opt.value}
+              style={[styles.fontRow, { borderBottomColor: theme.divider }]}
+              onPress={() => settings.setFontFamily(opt.value)}
+            >
+              <Text style={[styles.fontName, { color: theme.text, fontFamily: opt.value === 'System' ? undefined : opt.value }]}>
+                {opt.label}
+              </Text>
+              {settings.fontFamily === opt.value && (
+                <Text style={[styles.checkMark, { color: theme.accent }]}>✓</Text>
+              )}
+            </Pressable>
+          ))}
         </View>
 
         <Text style={[styles.sectionTitle, { color: theme.secondaryText }]}>主题</Text>
@@ -99,6 +135,22 @@ export default function SettingsScreen() {
                 <Text style={[styles.themeName, { color: theme.text }]}>{t.name}</Text>
               </View>
               {settings.theme === key && (
+                <Text style={[styles.checkMark, { color: theme.accent }]}>✓</Text>
+              )}
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: theme.secondaryText }]}>翻页</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.divider }]}>
+          {(Object.keys(flipTypeLabels) as Array<keyof typeof flipTypeLabels>).map((key) => (
+            <Pressable
+              key={key}
+              style={[styles.fontRow, { borderBottomColor: theme.divider }]}
+              onPress={() => settings.setFlipType(key)}
+            >
+              <Text style={[styles.fontName, { color: theme.text }]}>{flipTypeLabels[key]}</Text>
+              {settings.flipType === key && (
                 <Text style={[styles.checkMark, { color: theme.accent }]}>✓</Text>
               )}
             </Pressable>
@@ -200,6 +252,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     minWidth: 50,
     textAlign: 'center',
+  },
+  fontRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  fontName: {
+    fontSize: 15,
+    fontFamily: 'Inter',
+    fontWeight: '400',
   },
   themeRow: {
     flexDirection: 'row',

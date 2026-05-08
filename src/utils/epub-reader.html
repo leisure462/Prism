@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    #viewer { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="viewer"></div>
+  <script src="file:///android_asset/epub.min.js"></script>
+  <script>
+    var book = null;
+    var rendition = null;
+
+    function sendToRN(type, data) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(Object.assign({ type: type }, data || {})));
+    }
+
+    function initBook(fileUri, cfi) {
+      book = ePub(fileUri);
+      rendition = book.renderTo('viewer', {
+        width: '100%',
+        height: '100%',
+        spread: 'none',
+        flow: 'paginated',
+      });
+
+      // Apply current theme
+      applyTheme(window.__themeName || 'vellum', window.__fontSize || 100);
+
+      rendition.display(cfi || undefined).then(function() {
+        sendToRN('ready', {});
+      });
+
+      rendition.on('relocated', function(location) {
+        var cfi = location.start.cfi;
+        var percentage = location.start.percentage;
+        var index = location.start.index;
+        sendToRN('relocated', { cfi: cfi, percentage: percentage, chapterIndex: index });
+      });
+
+      book.ready.then(function() {
+        book.locations.generate(1600).then(function() {
+          sendToRN('locationsReady', {});
+        });
+      });
+    }
+
+    function applyTheme(themeName, fontSize) {
+      if (!rendition) return;
+
+      var themes = {
+        vellum: { body: { background: '#faf9f5', color: '#141413' }, a: { color: '#d97757' } },
+        ink: { body: { background: '#1a1a1a', color: '#d4d0c8' }, a: { color: '#d97757' } },
+        parchment: { body: { background: '#f0e6d3', color: '#3a3530' }, a: { color: '#8b6914' } },
+        azure: { body: { background: '#e8eff5', color: '#2a3a4a' }, a: { color: '#4a7a9b' } },
+      };
+
+      var t = themes[themeName] || themes.vellum;
+      rendition.themes.register(themeName, t);
+      rendition.themes.select(themeName);
+      rendition.themes.fontSize(fontSize + '%');
+
+      window.__themeName = themeName;
+      window.__fontSize = fontSize;
+    }
+
+    document.addEventListener('message', function(e) {
+      var msg;
+      try { msg = JSON.parse(e.data); } catch(err) { return; }
+
+      switch (msg.type) {
+        case 'load':
+          initBook(msg.fileUri, msg.cfi || null);
+          break;
+        case 'next':
+          if (rendition) rendition.next();
+          break;
+        case 'prev':
+          if (rendition) rendition.prev();
+          break;
+        case 'gotoCFI':
+          if (rendition && msg.cfi) rendition.display(msg.cfi);
+          break;
+        case 'gotoHref':
+          if (rendition && msg.href) rendition.display(msg.href);
+          break;
+        case 'setTheme':
+          applyTheme(msg.theme, msg.fontSize || 100);
+          break;
+        case 'setFontSize':
+          if (rendition) {
+            rendition.themes.fontSize(msg.fontSize + '%');
+            window.__fontSize = msg.fontSize;
+          }
+          break;
+      }
+    });
+  </script>
+</body>
+</html>

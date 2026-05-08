@@ -1,21 +1,26 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet, View } from 'react-native';
+import { Pressable, Text, StyleSheet, View, Image } from 'react-native';
 import { Book } from '../types';
 
 interface BookCardProps {
   book: Book;
   onPress: () => void;
+  onLongPress?: () => void;
 }
 
-export default function BookCard({ book, onPress }: BookCardProps) {
+export default function BookCard({ book, onPress, onLongPress }: BookCardProps) {
   const formatLabel = { txt: 'TXT', epub: 'EPUB', pdf: 'PDF' }[book.format];
 
   return (
-    <Pressable onPress={onPress} style={styles.card}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} style={styles.card}>
       <View style={styles.cover}>
-        <Text style={styles.coverTitle} numberOfLines={2}>
-          {book.title}
-        </Text>
+        {book.coverUri ? (
+          <Image source={{ uri: book.coverUri }} style={styles.coverImage} resizeMode="cover" />
+        ) : (
+          <Text style={styles.coverTitle} numberOfLines={4}>
+            {book.title}
+          </Text>
+        )}
         <View style={styles.formatBadge}>
           <Text style={styles.formatText}>{formatLabel}</Text>
         </View>
@@ -44,6 +49,15 @@ const styles = StyleSheet.create({
     padding: 16,
     justifyContent: 'space-between',
     marginBottom: 8,
+    overflow: 'hidden',
+  },
+  coverImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 9.6,
   },
   coverTitle: {
     fontSize: 14,

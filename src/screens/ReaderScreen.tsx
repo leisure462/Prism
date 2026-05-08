@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,10 @@ import { useSettingsStore } from '../store/settingsStore';
 import { themes } from '../utils/theme';
 import { getChapterContent } from '../parsers/TxtParser';
 import IconButton from '../components/IconButton';
+import EpubReader from '../components/EpubReader';
+import TocDrawer from '../components/TocDrawer';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get('window');
 
 export default function ReaderScreen() {
   const route = useRoute();
@@ -28,15 +30,18 @@ export default function ReaderScreen() {
   const insets = useSafeAreaInsets();
   const { bookId } = route.params as { bookId: string };
 
-  const { books, chapters, updateBookProgress } = useBookshelfStore();
+  const { books, bookChapters, updateBookProgress } = useBookshelfStore();
   const settings = useSettingsStore();
   const theme = themes[settings.theme] || themes.vellum;
 
   const book = books.find((b) => b.id === bookId);
+  const chapters = bookChapters[bookId] || [];
   const [content, setContent] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [tocVisible, setTocVisible] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
+  const epubReaderRef = useRef<any>(null);
 
   useEffect(() => {
     if (!book) return;
@@ -80,6 +85,14 @@ export default function ReaderScreen() {
     updateBookProgress(book.id, 0, prev);
   }, [book, updateBookProgress]);
 
+  const handleTocSelect = useCallback(
+    (index: number) => {
+      if (!book) return;
+      updateBookProgress(book.id, 0, index);
+    },
+    [book, updateBookProgress]
+  );
+
   const tapGesture = Gesture.Tap()
     .onEnd((event) => {
       const { x } = event;
@@ -103,9 +116,10 @@ export default function ReaderScreen() {
   }
 
   const currentChapter = chapters[book.currentChapter];
+  const isEpub = book.format === 'epub';
 
   return (
-    <GestureDetector gesture={tapGesture}>
+    <GestureDetector gesture={isEpub ? Gesture.Tap() : tapGesture}>
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Top Bar */}
         <Animated.View
@@ -123,36 +137,53 @@ export default function ReaderScreen() {
           <Text style={[styles.chapterTitle, { color: theme.text }]} numberOfLines={1}>
             {currentChapter?.title || book.title}
           </Text>
-          <View style={{ width: 60 }} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <IconButton label="目录" onPress={() => setTocVisible(true)} color={theme.text} />
+            <View style={{ width: 20 }} />
+          </View>
         </Animated.View>
 
         {/* Content */}
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.contentContainer,
-            {
-              paddingHorizontal: settings.marginHorizontal,
-              paddingVertical: settings.marginVertical,
-            },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text
-            style={[
-              styles.bodyText,
+        {isEpub ? (
+          <EpubReader
+            bookId={bookId}
+            filePath={book.filePath}
+            epubCfi={book.epubCfi}
+            theme={settings.theme}
+            fontSize={settings.fontSize}
+            onLocationChange={(cfi, percentage) => {
+              updateBookProgress(book.id, Math.round(percentage * 100), book.currentChapter, cfi);
+            }}
+            onToggleMenu={toggleMenu}
+          />
+        ) : (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.contentContainer,
               {
-                color: theme.text,
-                fontSize: settings.fontSize,
-                lineHeight: settings.fontSize * settings.lineHeight,
-                fontFamily: settings.fontFamily === 'System' ? undefined : settings.fontFamily,
-                marginBottom: settings.paragraphSpacing,
+                paddingHorizontal: settings.marginHorizontal,
+                paddingVertical: settings.marginVertical,
               },
             ]}
+            showsVerticalScrollIndicator={false}
           >
-            {content}
-          </Text>
-        </ScrollView>
+            <Text
+              style={[
+                styles.bodyText,
+                {
+                  color: theme.text,
+                  fontSize: settings.fontSize,
+                  lineHeight: settings.fontSize * settings.lineHeight,
+                  fontFamily: settings.fontFamily === 'System' ? undefined : settings.fontFamily,
+                  marginBottom: settings.paragraphSpacing,
+                },
+              ]}
+            >
+              {content}
+            </Text>
+          </ScrollView>
+        )}
 
         {/* Bottom Bar */}
         <Animated.View
@@ -193,6 +224,32 @@ export default function ReaderScreen() {
             </View>
 
             <View style={styles.settingRow}>
+              <Text style={[styles.settingLabel, { color: theme.text }]}>行距</Text>
+              <View style={styles.settingControls}>
+                <Pressable onPress={() => settings.setLineHeight(Math.max(1.2, settings.lineHeight - 0.1))}>
+                  <Text style={[styles.controlBtn, { color: theme.accent }]}>-</Text>
+                </Pressable>
+                <Text style={[styles.settingValue, { color: theme.text }]}>{settings.lineHeight.toFixed(1)}</Text>
+                <Pressable onPress={() => settings.setLineHeight(Math.min(2.5, settings.lineHeight + 0.1))}>
+                  <Text style={[styles.controlBtn, { color: theme.accent }]}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.settingRow}>
+              <Text style={[styles.settingLabel, { color: theme.text }]}>边距</Text>
+              <View style={styles.settingControls}>
+                <Pressable onPress={() => settings.setMarginHorizontal(Math.max(8, settings.marginHorizontal - 4))}>
+                  <Text style={[styles.controlBtn, { color: theme.accent }]}>-</Text>
+                </Pressable>
+                <Text style={[styles.settingValue, { color: theme.text }]}>{settings.marginHorizontal}</Text>
+                <Pressable onPress={() => settings.setMarginHorizontal(Math.min(48, settings.marginHorizontal + 4))}>
+                  <Text style={[styles.controlBtn, { color: theme.accent }]}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.settingRow}>
               <Text style={[styles.settingLabel, { color: theme.text }]}>主题</Text>
               <View style={styles.themeRow}>
                 {Object.entries(themes).map(([key, t]) => (
@@ -209,21 +266,17 @@ export default function ReaderScreen() {
                 ))}
               </View>
             </View>
-
-            <View style={styles.settingRow}>
-              <Text style={[styles.settingLabel, { color: theme.text }]}>行距</Text>
-              <View style={styles.settingControls}>
-                <Pressable onPress={() => settings.setLineHeight(Math.max(1.2, settings.lineHeight - 0.1))}>
-                  <Text style={[styles.controlBtn, { color: theme.accent }]}>-</Text>
-                </Pressable>
-                <Text style={[styles.settingValue, { color: theme.text }]}>{settings.lineHeight.toFixed(1)}</Text>
-                <Pressable onPress={() => settings.setLineHeight(Math.min(2.5, settings.lineHeight + 0.1))}>
-                  <Text style={[styles.controlBtn, { color: theme.accent }]}>+</Text>
-                </Pressable>
-              </View>
-            </View>
           </View>
         )}
+
+        {/* TOC Drawer */}
+        <TocDrawer
+          visible={tocVisible}
+          chapters={chapters}
+          currentChapter={book.currentChapter}
+          onSelect={handleTocSelect}
+          onClose={() => setTocVisible(false)}
+        />
       </View>
     </GestureDetector>
   );

@@ -10,6 +10,7 @@ export interface Book {
   currentChapter: number;
   addedAt: number;
   lastReadAt?: number;
+  epubCfi?: string;
 }
 
 export interface Chapter {
@@ -17,6 +18,7 @@ export interface Chapter {
   title: string;
   startOffset: number;
   endOffset: number;
+  href?: string;
 }
 
 export interface ReaderTheme {
@@ -41,4 +43,11 @@ export interface ReaderSettings {
   keepScreenOn: boolean;
   showStatusBar: boolean;
   flipType: 'slide' | 'tap' | 'volume';
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  bookIds: string[];
+  createdAt: number;
 }
